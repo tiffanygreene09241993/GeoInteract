@@ -1,0 +1,224 @@
+{
+  "entities": {
+    "UserPublicProfile": {
+      "title": "UserPublicProfile",
+      "description": "Public display metadata for trip collaborators without PII.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "photoUrl": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII record accessible strictly by the account owner.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 254 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "updatedAt"]
+    },
+    "UserPreferences": {
+      "title": "UserPreferences",
+      "description": "User travel preferences, theme, haptics, and smart notification filters.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "theme": { "type": "string", "enum": ["dark", "light"], "maxLength": 16 },
+        "hapticsEnabled": { "type": "boolean" },
+        "offlineModePreferred": { "type": "boolean" },
+        "travelMode": { "type": "string", "enum": ["WALKING", "DRIVING", "BICYCLING", "TRANSIT"], "maxLength": 24 },
+        "avoidTolls": { "type": "boolean" },
+        "ecoRouting": { "type": "boolean" },
+        "suppressMinorAlerts": { "type": "boolean" },
+        "notifyScheduleImpact": { "type": "boolean" },
+        "notifyLastMinuteAlerts": { "type": "boolean" },
+        "notifyGeofence": { "type": "boolean" },
+        "notifyCollab": { "type": "boolean" },
+        "highlightNormalTasks": { "type": "boolean" },
+        "interests": { "type": "string", "maxLength": 400 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "theme", "hapticsEnabled", "suppressMinorAlerts", "highlightNormalTasks", "updatedAt"]
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "End-to-end encrypted collaborative travel workspace.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "collaboratorUids": { "type": "array", "description": "Bounded list of up to 20 collaborator UIDs." },
+        "encryptedPayload": { "type": "string", "minLength": 1, "maxLength": 32768 },
+        "iv": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "keyFingerprint": { "type": "string", "minLength": 4, "maxLength": 64 },
+        "encryptionAlgo": { "type": "string", "enum": ["AES-GCM-256"], "maxLength": 24 },
+        "status": { "type": "string", "enum": ["active", "archived"], "maxLength": 24 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "collaboratorUids", "encryptedPayload", "iv", "keyFingerprint", "encryptionAlgo", "status", "createdAt", "updatedAt"]
+    },
+    "TripMember": {
+      "title": "TripMember",
+      "description": "Authorized collaborator membership record for a trip.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tripId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "role": { "type": "string", "enum": ["owner", "editor", "viewer"], "maxLength": 16 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "inviteCode": { "type": "string", "maxLength": 64 },
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "tripId", "role", "displayName", "joinedAt", "updatedAt"]
+    },
+    "TripInvite": {
+      "title": "TripInvite",
+      "description": "Cryptographic invite token for joining a shared trip.",
+      "type": "object",
+      "properties": {
+        "inviteCode": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tripId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdBy": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "role": { "type": "string", "enum": ["editor", "viewer"], "maxLength": 16 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["inviteCode", "tripId", "createdBy", "role", "active", "createdAt", "updatedAt"]
+    },
+    "TripStop": {
+      "title": "TripStop",
+      "description": "Encrypted itinerary stop or task pinned to a trip.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tripId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "collaboratorUids": { "type": "array" },
+        "createdBy": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "dayIndex": { "type": "integer" },
+        "orderIndex": { "type": "integer" },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"], "maxLength": 16 },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "placeId": { "type": "string", "maxLength": 256 },
+        "status": { "type": "string", "enum": ["planned", "active", "completed", "skipped"], "maxLength": 24 },
+        "encryptedPayload": { "type": "string", "minLength": 1, "maxLength": 32768 },
+        "iv": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tripId", "ownerId", "collaboratorUids", "createdBy", "dayIndex", "orderIndex", "priority", "lat", "lng", "placeId", "status", "encryptedPayload", "iv", "createdAt", "updatedAt"]
+    },
+    "TripGeofence": {
+      "title": "TripGeofence",
+      "description": "Encrypted circular geofence trigger attached to a trip.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tripId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "collaboratorUids": { "type": "array" },
+        "createdBy": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "radiusMeters": { "type": "number" },
+        "triggerOn": { "type": "string", "enum": ["enter", "exit", "both"], "maxLength": 16 },
+        "active": { "type": "boolean" },
+        "encryptedPayload": { "type": "string", "minLength": 1, "maxLength": 8192 },
+        "iv": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tripId", "ownerId", "collaboratorUids", "createdBy", "lat", "lng", "radiusMeters", "triggerOn", "active", "encryptedPayload", "iv", "createdAt", "updatedAt"]
+    },
+    "TripAlert": {
+      "title": "TripAlert",
+      "description": "Encrypted itinerary alert with severity triage metadata.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tripId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "collaboratorUids": { "type": "array" },
+        "createdBy": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "severity": { "type": "string", "enum": ["minor", "normal", "schedule_impact", "last_minute_alert"], "maxLength": 24 },
+        "category": { "type": "string", "enum": ["schedule", "transit", "weather", "venue", "geofence", "collab"], "maxLength": 24 },
+        "scheduleDeltaMinutes": { "type": "integer" },
+        "encryptedPayload": { "type": "string", "minLength": 1, "maxLength": 8192 },
+        "iv": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tripId", "ownerId", "collaboratorUids", "createdBy", "severity", "category", "scheduleDeltaMinutes", "encryptedPayload", "iv", "createdAt", "updatedAt"]
+    },
+    "TripMessage": {
+      "title": "TripMessage",
+      "description": "Encrypted AI concierge and collaborator message entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tripId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "collaboratorUids": { "type": "array" },
+        "senderUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "role": { "type": "string", "enum": ["user", "assistant"], "maxLength": 16 },
+        "encryptedPayload": { "type": "string", "minLength": 1, "maxLength": 65536 },
+        "iv": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tripId", "ownerId", "collaboratorUids", "senderUid", "role", "encryptedPayload", "iv", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/public/profile": {
+      "schema": { "$ref": "#/entities/UserPublicProfile" },
+      "description": "Public collaborator display name and avatar."
+    },
+    "/users/{userId}/private/info": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Owner-only private PII email record."
+    },
+    "/users/{userId}/preferences/settings": {
+      "schema": { "$ref": "#/entities/UserPreferences" },
+      "description": "Owner-only travel, theme, haptic, and notification filter preferences."
+    },
+    "/trips/{tripId}": {
+      "schema": { "$ref": "#/entities/Trip" },
+      "description": "Top-level E2EE encrypted travel schedule workspace."
+    },
+    "/trips/{tripId}/members/{memberUid}": {
+      "schema": { "$ref": "#/entities/TripMember" },
+      "description": "Collaborator access control records for the trip."
+    },
+    "/trips/{tripId}/invites/{inviteCode}": {
+      "schema": { "$ref": "#/entities/TripInvite" },
+      "description": "Cryptographic invite tokens for joining a shared trip."
+    },
+    "/trips/{tripId}/stops/{stopId}": {
+      "schema": { "$ref": "#/entities/TripStop" },
+      "description": "Encrypted itinerary stops and tasks for the trip."
+    },
+    "/trips/{tripId}/geofences/{geofenceId}": {
+      "schema": { "$ref": "#/entities/TripGeofence" },
+      "description": "Encrypted geofence zones for location alerts."
+    },
+    "/trips/{tripId}/alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/TripAlert" },
+      "description": "Encrypted travel alerts and schedule impact notifications."
+    },
+    "/trips/{tripId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/TripMessage" },
+      "description": "Encrypted multi-turn chatbot and trip thread history."
+    }
+  }
+}

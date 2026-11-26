@@ -1,0 +1,574 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Pillar 3: Reusable Hardened Primitives ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidCollabList(uids) {
+      return uids is list
+        && uids.size() >= 1
+        && uids.size() <= 20
+        && uids[0] is string
+        && uids[0].size() <= 128;
+    }
+
+    // --- Validation Blueprints (Pillar 2) ---
+    function isValidPublicProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'photoUrl', 'updatedAt'])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateInfo(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'updatedAt'])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPreferences(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'theme', 'hapticsEnabled', 'suppressMinorAlerts',
+          'highlightNormalTasks', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'theme', 'hapticsEnabled', 'offlineModePreferred',
+          'travelMode', 'avoidTolls', 'ecoRouting', 'suppressMinorAlerts',
+          'notifyScheduleImpact', 'notifyLastMinuteAlerts', 'notifyGeofence',
+          'notifyCollab', 'highlightNormalTasks', 'interests', 'updatedAt'
+        ])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.theme is string && data.theme in ['dark', 'light'] && data.theme.size() <= 16
+        && data.hapticsEnabled is bool
+        && (!('offlineModePreferred' in data) || data.offlineModePreferred is bool)
+        && (!('travelMode' in data) || (data.travelMode is string && data.travelMode in ['WALKING', 'DRIVING', 'BICYCLING', 'TRANSIT'] && data.travelMode.size() <= 24))
+        && (!('avoidTolls' in data) || data.avoidTolls is bool)
+        && (!('ecoRouting' in data) || data.ecoRouting is bool)
+        && data.suppressMinorAlerts is bool
+        && (!('notifyScheduleImpact' in data) || data.notifyScheduleImpact is bool)
+        && (!('notifyLastMinuteAlerts' in data) || data.notifyLastMinuteAlerts is bool)
+        && (!('notifyGeofence' in data) || data.notifyGeofence is bool)
+        && (!('notifyCollab' in data) || data.notifyCollab is bool)
+        && data.highlightNormalTasks is bool
+        && (!('interests' in data) || (data.interests is string && data.interests.size() <= 400))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTrip(data, tripId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'collaboratorUids', 'encryptedPayload', 'iv',
+          'keyFingerprint', 'encryptionAlgo', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'collaboratorUids', 'encryptedPayload', 'iv',
+          'keyFingerprint', 'encryptionAlgo', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id == tripId && isValidId(data.id)
+        && data.ownerId is string && isValidId(data.ownerId)
+        && isValidCollabList(data.collaboratorUids)
+        && data.ownerId in data.collaboratorUids
+        && data.encryptedPayload is string && data.encryptedPayload.size() >= 1 && data.encryptedPayload.size() <= 32768
+        && data.iv is string && data.iv.size() >= 1 && data.iv.size() <= 64
+        && data.keyFingerprint is string && data.keyFingerprint.size() >= 4 && data.keyFingerprint.size() <= 64
+        && data.encryptionAlgo is string && data.encryptionAlgo == 'AES-GCM-256' && data.encryptionAlgo.size() <= 24
+        && data.status is string && data.status in ['active', 'archived'] && data.status.size() <= 24
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTripMember(data, tripId, memberUid) {
+      return data.keys().hasAll(['uid', 'tripId', 'role', 'displayName', 'joinedAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'tripId', 'role', 'displayName', 'inviteCode', 'joinedAt', 'updatedAt'])
+        && data.uid is string && data.uid == memberUid && isValidId(data.uid)
+        && data.tripId is string && data.tripId == tripId && isValidId(data.tripId)
+        && data.role is string && data.role in ['owner', 'editor', 'viewer'] && data.role.size() <= 16
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && (!('inviteCode' in data) || (data.inviteCode is string && data.inviteCode.size() <= 64))
+        && data.joinedAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTripInvite(data, tripId, inviteCode) {
+      return data.keys().hasAll(['inviteCode', 'tripId', 'createdBy', 'role', 'active', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['inviteCode', 'tripId', 'createdBy', 'role', 'active', 'createdAt', 'updatedAt'])
+        && data.inviteCode is string && data.inviteCode == inviteCode && isValidId(data.inviteCode)
+        && data.tripId is string && data.tripId == tripId && isValidId(data.tripId)
+        && data.createdBy is string && isValidId(data.createdBy)
+        && data.role is string && data.role in ['editor', 'viewer'] && data.role.size() <= 16
+        && data.active is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTripStop(data, tripId, stopId) {
+      return data.keys().hasAll([
+          'id', 'tripId', 'ownerId', 'collaboratorUids', 'createdBy',
+          'dayIndex', 'orderIndex', 'priority', 'lat', 'lng', 'placeId',
+          'status', 'encryptedPayload', 'iv', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'tripId', 'ownerId', 'collaboratorUids', 'createdBy',
+          'dayIndex', 'orderIndex', 'priority', 'lat', 'lng', 'placeId',
+          'status', 'encryptedPayload', 'iv', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id == stopId && isValidId(data.id)
+        && data.tripId is string && data.tripId == tripId && isValidId(data.tripId)
+        && data.ownerId is string && isValidId(data.ownerId)
+        && isValidCollabList(data.collaboratorUids)
+        && data.createdBy is string && isValidId(data.createdBy)
+        && data.dayIndex is int && data.dayIndex >= 0 && data.dayIndex <= 365
+        && data.orderIndex is int && data.orderIndex >= 0 && data.orderIndex <= 500
+        && data.priority is string && data.priority in ['low', 'normal', 'high'] && data.priority.size() <= 16
+        && data.lat is number && data.lat >= -90 && data.lat <= 90
+        && data.lng is number && data.lng >= -180 && data.lng <= 180
+        && data.placeId is string && data.placeId.size() <= 256
+        && data.status is string && data.status in ['planned', 'active', 'completed', 'skipped'] && data.status.size() <= 24
+        && data.encryptedPayload is string && data.encryptedPayload.size() >= 1 && data.encryptedPayload.size() <= 32768
+        && data.iv is string && data.iv.size() >= 1 && data.iv.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTripGeofence(data, tripId, geofenceId) {
+      return data.keys().hasAll([
+          'id', 'tripId', 'ownerId', 'collaboratorUids', 'createdBy',
+          'lat', 'lng', 'radiusMeters', 'triggerOn', 'active',
+          'encryptedPayload', 'iv', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'tripId', 'ownerId', 'collaboratorUids', 'createdBy',
+          'lat', 'lng', 'radiusMeters', 'triggerOn', 'active',
+          'encryptedPayload', 'iv', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id == geofenceId && isValidId(data.id)
+        && data.tripId is string && data.tripId == tripId && isValidId(data.tripId)
+        && data.ownerId is string && isValidId(data.ownerId)
+        && isValidCollabList(data.collaboratorUids)
+        && data.createdBy is string && isValidId(data.createdBy)
+        && data.lat is number && data.lat >= -90 && data.lat <= 90
+        && data.lng is number && data.lng >= -180 && data.lng <= 180
+        && data.radiusMeters is number && data.radiusMeters >= 25 && data.radiusMeters <= 50000
+        && data.triggerOn is string && data.triggerOn in ['enter', 'exit', 'both'] && data.triggerOn.size() <= 16
+        && data.active is bool
+        && data.encryptedPayload is string && data.encryptedPayload.size() >= 1 && data.encryptedPayload.size() <= 8192
+        && data.iv is string && data.iv.size() >= 1 && data.iv.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTripAlert(data, tripId, alertId) {
+      return data.keys().hasAll([
+          'id', 'tripId', 'ownerId', 'collaboratorUids', 'createdBy',
+          'severity', 'category', 'scheduleDeltaMinutes',
+          'encryptedPayload', 'iv', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'tripId', 'ownerId', 'collaboratorUids', 'createdBy',
+          'severity', 'category', 'scheduleDeltaMinutes',
+          'encryptedPayload', 'iv', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id == alertId && isValidId(data.id)
+        && data.tripId is string && data.tripId == tripId && isValidId(data.tripId)
+        && data.ownerId is string && isValidId(data.ownerId)
+        && isValidCollabList(data.collaboratorUids)
+        && data.createdBy is string && isValidId(data.createdBy)
+        && data.severity is string && data.severity in ['minor', 'normal', 'schedule_impact', 'last_minute_alert'] && data.severity.size() <= 24
+        && data.category is string && data.category in ['schedule', 'transit', 'weather', 'venue', 'geofence', 'collab'] && data.category.size() <= 24
+        && data.scheduleDeltaMinutes is int && data.scheduleDeltaMinutes >= -1440 && data.scheduleDeltaMinutes <= 1440
+        && data.encryptedPayload is string && data.encryptedPayload.size() >= 1 && data.encryptedPayload.size() <= 8192
+        && data.iv is string && data.iv.size() >= 1 && data.iv.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTripMessage(data, tripId, messageId) {
+      return data.keys().hasAll([
+          'id', 'tripId', 'ownerId', 'collaboratorUids', 'senderUid',
+          'role', 'encryptedPayload', 'iv', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'tripId', 'ownerId', 'collaboratorUids', 'senderUid',
+          'role', 'encryptedPayload', 'iv', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id == messageId && isValidId(data.id)
+        && data.tripId is string && data.tripId == tripId && isValidId(data.tripId)
+        && data.ownerId is string && isValidId(data.ownerId)
+        && isValidCollabList(data.collaboratorUids)
+        && data.senderUid is string && isValidId(data.senderUid)
+        && data.role is string && data.role in ['user', 'assistant'] && data.role.size() <= 16
+        && data.encryptedPayload is string && data.encryptedPayload.size() >= 1 && data.encryptedPayload.size() <= 65536
+        && data.iv is string && data.iv.size() >= 1 && data.iv.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // --- Relational Helpers (Master Gate - used ONLY on single-doc ops, NEVER in list) ---
+    function tripDoc(tripId) {
+      return get(/databases/$(database)/documents/trips/$(tripId)).data;
+    }
+
+    function isTripOwner(tripId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/trips/$(tripId))
+        && tripDoc(tripId).ownerId == request.auth.uid;
+    }
+
+    function isTripMember(tripId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/trips/$(tripId))
+        && (
+          tripDoc(tripId).ownerId == request.auth.uid
+          || request.auth.uid in tripDoc(tripId).collaboratorUids
+          || exists(/databases/$(database)/documents/trips/$(tripId)/members/$(request.auth.uid))
+        );
+    }
+
+    function isTripEditorOrOwner(tripId) {
+      return isTripOwner(tripId) || (
+        isSignedIn()
+        && exists(/databases/$(database)/documents/trips/$(tripId))
+        && exists(/databases/$(database)/documents/trips/$(tripId)/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/trips/$(tripId)/members/$(request.auth.uid)).data.role in ['owner', 'editor']
+      );
+    }
+
+    function tripNotArchived(tripId) {
+      return tripDoc(tripId).status != 'archived';
+    }
+
+    // --- Pillar 6: Split Collection PII Isolation ---
+    match /users/{userId}/public/profile {
+      allow get: if isSignedIn();
+      allow create, update: if isVerifiedUser()
+        && isOwner(userId)
+        && isValidPublicProfile(incoming(), userId)
+        && incoming().updatedAt == request.time;
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/private/info {
+      allow get: if isOwner(userId);
+      allow create, update: if isVerifiedUser()
+        && isOwner(userId)
+        && isValidPrivateInfo(incoming(), userId)
+        && incoming().updatedAt == request.time;
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/preferences/settings {
+      allow get: if isOwner(userId);
+      allow create, update: if isVerifiedUser()
+        && isOwner(userId)
+        && isValidUserPreferences(incoming(), userId)
+        && incoming().updatedAt == request.time;
+      allow delete: if isOwner(userId);
+    }
+
+    // --- Trips Collection ---
+    match /trips/{tripId} {
+      allow get: if isValidId(tripId) && isSignedIn() && (
+        existing().ownerId == request.auth.uid
+        || request.auth.uid in existing().collaboratorUids
+      );
+      allow list: if isSignedIn() && (
+        resource.data.ownerId == request.auth.uid
+        || request.auth.uid in resource.data.collaboratorUids
+      );
+
+      allow create: if isVerifiedUser()
+        && isValidId(tripId)
+        && isValidTrip(incoming(), tripId)
+        && incoming().ownerId == request.auth.uid
+        && incoming().status == 'active'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser()
+        && isValidId(tripId)
+        && isValidTrip(incoming(), tripId)
+        && incoming().id == existing().id
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Owner updates trip details or archives/unarchives
+          (existing().ownerId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'encryptedPayload', 'iv', 'keyFingerprint', 'collaboratorUids', 'status', 'updatedAt'
+            ]))
+          ||
+          // Action 2: Active editor updates encrypted payload (blocked if archived)
+          (existing().status != 'archived'
+            && isTripEditorOrOwner(tripId)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'encryptedPayload', 'iv', 'updatedAt'
+            ]))
+          ||
+          // Action 3: Invitee atomically joins collaboratorUids with membership doc
+          (existing().status != 'archived'
+            && !(request.auth.uid in existing().collaboratorUids)
+            && incoming().collaboratorUids.hasAll(existing().collaboratorUids)
+            && request.auth.uid in incoming().collaboratorUids
+            && incoming().collaboratorUids.size() == existing().collaboratorUids.size() + 1
+            && existsAfter(/databases/$(database)/documents/trips/$(tripId)/members/$(request.auth.uid))
+            && incoming().diff(existing()).affectedKeys().hasOnly(['collaboratorUids', 'updatedAt']))
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(tripId) && existing().ownerId == request.auth.uid;
+
+      // --- Members Subcollection ---
+      match /members/{memberUid} {
+        allow get: if isValidId(tripId) && isValidId(memberUid) && isTripMember(tripId);
+        allow list: if isSignedIn() && resource.data.tripId == tripId && (
+          resource.data.uid == request.auth.uid
+        );
+
+        allow create: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(memberUid)
+          && isValidTripMember(incoming(), tripId, memberUid)
+          && incoming().joinedAt == request.time
+          && incoming().updatedAt == request.time
+          && (
+            // Owner initializes own membership
+            (isTripOwner(tripId) && memberUid == request.auth.uid && incoming().role == 'owner')
+            ||
+            // User joins via valid active cryptographic invite code
+            (memberUid == request.auth.uid
+              && 'inviteCode' in incoming()
+              && isValidId(incoming().inviteCode)
+              && exists(/databases/$(database)/documents/trips/$(tripId)/invites/$(incoming().inviteCode))
+              && get(/databases/$(database)/documents/trips/$(tripId)/invites/$(incoming().inviteCode)).data.active == true
+              && incoming().role == get(/databases/$(database)/documents/trips/$(tripId)/invites/$(incoming().inviteCode)).data.role)
+          );
+
+        allow update: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(memberUid)
+          && isValidTripMember(incoming(), tripId, memberUid)
+          && incoming().uid == existing().uid
+          && incoming().tripId == existing().tripId
+          && incoming().joinedAt == existing().joinedAt
+          && incoming().updatedAt == request.time
+          && (
+            (isTripOwner(tripId) && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'updatedAt']))
+            ||
+            (memberUid == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']))
+          );
+
+        allow delete: if isVerifiedUser() && isValidId(tripId) && isValidId(memberUid) && (
+          isTripOwner(tripId) || memberUid == request.auth.uid
+        );
+      }
+
+      // --- Invites Subcollection ---
+      match /invites/{inviteCode} {
+        allow get: if isValidId(tripId) && isValidId(inviteCode) && isSignedIn() && existing().active == true;
+        allow list: if isSignedIn() && resource.data.createdBy == request.auth.uid;
+
+        allow create: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(inviteCode)
+          && isValidTripInvite(incoming(), tripId, inviteCode)
+          && isTripOwner(tripId)
+          && incoming().createdBy == request.auth.uid
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+
+        allow update: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(inviteCode)
+          && isValidTripInvite(incoming(), tripId, inviteCode)
+          && isTripOwner(tripId)
+          && incoming().inviteCode == existing().inviteCode
+          && incoming().tripId == existing().tripId
+          && incoming().createdBy == existing().createdBy
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['active', 'updatedAt']);
+
+        allow delete: if isVerifiedUser() && isValidId(tripId) && isValidId(inviteCode) && isTripOwner(tripId);
+      }
+
+      // --- Stops Subcollection ---
+      match /stops/{stopId} {
+        allow get: if isValidId(tripId) && isValidId(stopId) && isTripMember(tripId);
+        allow list: if isSignedIn() && (
+          resource.data.ownerId == request.auth.uid
+          || request.auth.uid in resource.data.collaboratorUids
+        );
+
+        allow create: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(stopId)
+          && isValidTripStop(incoming(), tripId, stopId)
+          && isTripEditorOrOwner(tripId)
+          && tripNotArchived(tripId)
+          && incoming().ownerId == tripDoc(tripId).ownerId
+          && incoming().createdBy == request.auth.uid
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+
+        allow update: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(stopId)
+          && isValidTripStop(incoming(), tripId, stopId)
+          && isTripEditorOrOwner(tripId)
+          && tripNotArchived(tripId)
+          && incoming().id == existing().id
+          && incoming().tripId == existing().tripId
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdBy == existing().createdBy
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'dayIndex', 'orderIndex', 'priority', 'status', 'encryptedPayload', 'iv', 'collaboratorUids', 'updatedAt'
+            ])
+          );
+
+        allow delete: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(stopId)
+          && isTripEditorOrOwner(tripId);
+      }
+
+      // --- Geofences Subcollection ---
+      match /geofences/{geofenceId} {
+        allow get: if isValidId(tripId) && isValidId(geofenceId) && isTripMember(tripId);
+        allow list: if isSignedIn() && (
+          resource.data.ownerId == request.auth.uid
+          || request.auth.uid in resource.data.collaboratorUids
+        );
+
+        allow create: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(geofenceId)
+          && isValidTripGeofence(incoming(), tripId, geofenceId)
+          && isTripEditorOrOwner(tripId)
+          && tripNotArchived(tripId)
+          && incoming().ownerId == tripDoc(tripId).ownerId
+          && incoming().createdBy == request.auth.uid
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+
+        allow update: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(geofenceId)
+          && isValidTripGeofence(incoming(), tripId, geofenceId)
+          && isTripEditorOrOwner(tripId)
+          && tripNotArchived(tripId)
+          && incoming().id == existing().id
+          && incoming().tripId == existing().tripId
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdBy == existing().createdBy
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'radiusMeters', 'triggerOn', 'active', 'encryptedPayload', 'iv', 'collaboratorUids', 'updatedAt'
+          ]);
+
+        allow delete: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(geofenceId)
+          && isTripEditorOrOwner(tripId);
+      }
+
+      // --- Alerts Subcollection ---
+      match /alerts/{alertId} {
+        allow get: if isValidId(tripId) && isValidId(alertId) && isTripMember(tripId);
+        allow list: if isSignedIn() && (
+          resource.data.ownerId == request.auth.uid
+          || request.auth.uid in resource.data.collaboratorUids
+        );
+
+        allow create: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(alertId)
+          && isValidTripAlert(incoming(), tripId, alertId)
+          && isTripEditorOrOwner(tripId)
+          && tripNotArchived(tripId)
+          && incoming().ownerId == tripDoc(tripId).ownerId
+          && incoming().createdBy == request.auth.uid
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+
+        allow update: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(alertId)
+          && isValidTripAlert(incoming(), tripId, alertId)
+          && isTripEditorOrOwner(tripId)
+          && incoming().id == existing().id
+          && incoming().tripId == existing().tripId
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdBy == existing().createdBy
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['collaboratorUids', 'updatedAt']);
+
+        allow delete: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(alertId)
+          && isTripEditorOrOwner(tripId);
+      }
+
+      // --- Messages Subcollection ---
+      match /messages/{messageId} {
+        allow get: if isValidId(tripId) && isValidId(messageId) && isTripMember(tripId);
+        allow list: if isSignedIn() && (
+          resource.data.ownerId == request.auth.uid
+          || request.auth.uid in resource.data.collaboratorUids
+        );
+
+        allow create: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(messageId)
+          && isValidTripMessage(incoming(), tripId, messageId)
+          && isTripMember(tripId)
+          && tripNotArchived(tripId)
+          && incoming().ownerId == tripDoc(tripId).ownerId
+          && incoming().senderUid == request.auth.uid
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+
+        allow update: if false;
+        allow delete: if isVerifiedUser()
+          && isValidId(tripId)
+          && isValidId(messageId)
+          && isTripOwner(tripId);
+      }
+    }
+  }
+}

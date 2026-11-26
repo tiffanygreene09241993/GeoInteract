@@ -1,0 +1,6 @@
+{
+  "name": "Waypost",
+  "description": "Interactive map-based travel companion with real-time Google Maps data, Gemini AI local discovery, offline routing, geofencing alerts, and end-to-end encrypted group itineraries.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

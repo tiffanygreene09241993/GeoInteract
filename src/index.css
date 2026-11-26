@@ -1,0 +1,241 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+
+  html,
+  body {
+    font-family: var(--font-sans);
+    overscroll-behavior-y: contain;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-mono, .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Safe area utility for iOS PWA bottom bar */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+@keyframes tactile-ping {
+  0% {
+    transform: scale(0.96);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-tactile {
+  animation: tactile-ping 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 3D Geofence Entry Map Pin Animations */
+@keyframes geofence-pin-3d-entry {
+  0% {
+    transform: translate3d(0, 0, 0) rotateY(0deg) rotateX(0deg) scale(1);
+    filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.45));
+  }
+  16% {
+    transform: translate3d(0, -18px, 28px) rotateY(180deg) rotateX(14deg) scale(1.26);
+    filter: drop-shadow(0 18px 20px rgba(16, 185, 129, 0.65));
+  }
+  34% {
+    transform: translate3d(0, -24px, 36px) rotateY(360deg) rotateX(-8deg) scale(1.32);
+    filter: drop-shadow(0 22px 26px rgba(56, 189, 248, 0.7));
+  }
+  48% {
+    transform: translate3d(0, -4px, 8px) rotateY(360deg) rotateX(6deg) scale(1.06);
+    filter: drop-shadow(0 6px 12px rgba(16, 185, 129, 0.55));
+  }
+  62% {
+    transform: translate3d(0, -14px, 20px) rotateY(360deg) rotateX(-4deg) scale(1.18);
+    filter: drop-shadow(0 14px 18px rgba(16, 185, 129, 0.6));
+  }
+  78% {
+    transform: translate3d(0, -2px, 4px) rotateY(360deg) rotateX(0deg) scale(1.04);
+    filter: drop-shadow(0 6px 10px rgba(16, 185, 129, 0.45));
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotateY(360deg) rotateX(0deg) scale(1.08);
+    filter: drop-shadow(0 8px 16px rgba(16, 185, 129, 0.55));
+  }
+}
+
+@keyframes geofence-ground-sonar {
+  0% {
+    transform: translate(-50%, -50%) rotateX(68deg) scale(0.35);
+    opacity: 0.95;
+  }
+  70% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotateX(68deg) scale(2.85);
+    opacity: 0;
+  }
+}
+
+@keyframes geofence-badge-pop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 10px) scale(0.75);
+  }
+  20% {
+    opacity: 1;
+    transform: translate3d(0, -4px, 24px) scale(1.05);
+  }
+  35%, 88% {
+    opacity: 1;
+    transform: translate3d(0, -2px, 20px) scale(1);
+  }
+  100% {
+    opacity: 0.95;
+    transform: translate3d(0, -2px, 20px) scale(1);
+  }
+}
+
+@keyframes geofence-svg-pin-3d-pop {
+  0% {
+    transform: perspective(480px) translateY(0px) rotateY(0deg) scale(1);
+    filter: drop-shadow(0 0 0 rgba(16, 185, 129, 0));
+  }
+  22% {
+    transform: perspective(480px) translateY(-10px) rotateY(180deg) scale(1.32);
+    filter: drop-shadow(0 8px 10px rgba(16, 185, 129, 0.75));
+  }
+  44% {
+    transform: perspective(480px) translateY(-13px) rotateY(360deg) scale(1.38);
+    filter: drop-shadow(0 10px 14px rgba(56, 189, 248, 0.8));
+  }
+  64% {
+    transform: perspective(480px) translateY(-3px) rotateY(360deg) scale(1.1);
+    filter: drop-shadow(0 4px 8px rgba(16, 185, 129, 0.6));
+  }
+  82% {
+    transform: perspective(480px) translateY(-7px) rotateY(360deg) scale(1.18);
+    filter: drop-shadow(0 6px 10px rgba(16, 185, 129, 0.65));
+  }
+  100% {
+    transform: perspective(480px) translateY(0px) rotateY(360deg) scale(1.1);
+    filter: drop-shadow(0 4px 10px rgba(16, 185, 129, 0.6));
+  }
+}
+
+@keyframes geofence-svg-sonar-ring {
+  0% {
+    transform: scale(0.45);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.geofence-pin-3d-stage {
+  perspective: 720px;
+  transform-style: preserve-3d;
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+
+.geofence-pin-3d-body {
+  transform-style: preserve-3d;
+  transform-origin: center bottom;
+  will-change: transform, filter;
+  animation: geofence-pin-3d-entry 1.85s cubic-bezier(0.22, 1, 0.36, 1) 2 forwards;
+}
+
+.geofence-pin-3d-ring {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  border: 2.5px solid #10b981;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.38) 0%, rgba(56, 189, 248, 0.14) 55%, transparent 72%);
+  pointer-events: none;
+  animation: geofence-ground-sonar 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.geofence-pin-3d-ring-delayed {
+  border-color: #38bdf8;
+  animation-delay: 0.55s;
+}
+
+.geofence-pin-3d-badge {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: geofence-badge-pop 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.geofence-svg-pin-3d {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: geofence-svg-pin-3d-pop 1.85s cubic-bezier(0.22, 1, 0.36, 1) 2 forwards;
+}
+
+.geofence-svg-ring-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: geofence-svg-sonar-ring 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.geofence-svg-ring-pulse-delayed {
+  animation-delay: 0.55s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .geofence-pin-3d-body,
+  .geofence-svg-pin-3d {
+    animation: none;
+    transform: scale(1.16);
+    filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.85));
+  }
+  .geofence-pin-3d-ring,
+  .geofence-svg-ring-pulse {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
